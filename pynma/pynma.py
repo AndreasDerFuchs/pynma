@@ -1,4 +1,6 @@
 #!/usr/bin/python
+import os
+import ssl
 
 from xml.dom.minidom import parseString
 
@@ -115,7 +117,33 @@ Warning: using batch_mode will return error only if all API keys are bad
         headers = { 'User-Agent': USER_AGENT }
         if method == "POST":
             headers['Content-type'] = "application/x-www-form-urlencoded"
-        http_handler = HTTPSConnection(API_SERVER)
+        proxy = None
+        if (proxy == None):
+           proxy = os.environ.get('https_proxy')
+        if (proxy == None):
+           proxy = os.environ.get('HTTPS_PROXY')
+        if (proxy == None):
+            # No proxy environement variable was defined, 
+            # so continue without a proxy:
+            http_handler = HTTPSConnection(API_SERVER)
+        else:
+            # A proxy server was defined, it could be any of these formats:
+            #   host:port
+            #   http://host:port
+            #   https://host:port
+            #   https://host:port/
+            # split the variable:
+            if proxy.startswith('https://'):
+                proxy=proxy[8:]
+            if proxy.startswith('http://'):
+                proxy=proxy[7:]
+            while proxy.endswith('/'):
+                proxy=proxy[:-1]
+            pparts = proxy.split(':')
+            ssl_context = ssl.create_default_context()
+            http_handler = HTTPSConnection(pparts[0], pparts[1], context=ssl_context)
+            http_handler.set_tunnel(API_SERVER, 443)
+
         http_handler.request(method, path, urlencode(args), headers)
         resp = http_handler.getresponse()
 
